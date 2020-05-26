@@ -4,6 +4,8 @@
 #include <map>
 #include "../dbcore/sm-log-recover-impl.h"
 
+#include "dash/ex_finger.h"
+
 namespace ermia {
 
 class Engine {
@@ -241,4 +243,63 @@ public:
 private:
   bool InsertIfAbsent(transaction *t, const varstr &key, OID oid) override;
 };
+
+// User-facing concurrent Masstree
+class DashExHash : public OrderedIndex {
+  friend class sm_log_recover_impl;
+  friend class sm_chkpt_mgr;
+
+private:
+  static const uint32_t kInitialSegments = 64;
+  dash::Hash<dash::string_key *> *hashtab_ = new dash::extendible::Finger_EH<dash::string_key *>(kInitialSegments);
+
+  // expect_new indicates if we expect the record to not exist in the tree- is
+  // just a hint that affects perf, not correctness. remove is put with
+  // nullptr as value.
+  rc_t DoTreePut(transaction &t, const varstr *k, varstr *v, bool expect_new,
+                 bool upsert, OID *inserted_oid);
+
+public:
+  DashExHash(std::string name, const char *primary)
+      : OrderedIndex(name, primary) {}
+
+  virtual void Get(transaction *t, rc_t &rc, const varstr &key, varstr &value,
+                   OID *out_oid = nullptr) override;
+
+  inline rc_t Put(transaction *t, const varstr &key, varstr &value) override {
+    return DoTreePut(*t, &key, &value, false, true, nullptr);
+  }
+  inline rc_t Insert(transaction *t, const varstr &key, varstr &value,
+                     OID *out_oid = nullptr) override {
+    return DoTreePut(*t, &key, &value, true, true, out_oid);
+  }
+  inline rc_t Insert(transaction *t, const varstr &key, OID oid) override {
+    return DoTreePut(*t, &key, (varstr *)&oid, true, false, nullptr);
+  }
+  inline rc_t Remove(transaction *t, const varstr &key) override {
+    return DoTreePut(*t, &key, nullptr, false, false, nullptr);
+  }
+
+  inline void SetArrays() override { } 
+
+  inline void
+  GetOID(const varstr &key, rc_t &rc, TXN::xid_context *xc, OID &out_oid,
+         ConcurrentMasstree::versioned_node_t *out_sinfo = nullptr) override {
+    // FIXME(tzwang): adapt Dash to use varstr directly or make it agnostic
+    varstr *vk = xc->xct->string_allocator().next(key.l + sizeof(dash::string_key));
+    dash::string_key *var_key = (dash::string_key *)vk->p;
+    memcpy(var_key->key, key.p, key.l);
+    OID oid = hashtab_->Get(var_key, false);
+    if (oid != INVALID_OID) {
+      out_oid = oid;
+      volatile_write(rc._val, RC_TRUE);
+    } else {
+      volatile_write(rc._val, RC_FALSE);
+    }
+  }
+
+private:
+  bool InsertIfAbsent(transaction *t, const varstr &key, OID oid) override;
+};
+
 } // namespace ermia

@@ -1,12 +1,20 @@
+if (POLICY CMP0048)
+  cmake_policy(SET CMP0048 NEW)
+endif ()
+
+project(ermia)
+cmake_minimum_required(VERSION 3.11)
+include(FetchContent)
+include(ExternalProject)
+
+set(CMAKE_CXX_STANDARD 17)
+
 # No in-source build
 if("${CMAKE_SOURCE_DIR}" STREQUAL "${CMAKE_BINARY_DIR}")
   message(FATAL_ERROR "In-source builds are not allowed.")
 endif("${CMAKE_SOURCE_DIR}" STREQUAL "${CMAKE_BINARY_DIR}")
 
-project(ermia)
-cmake_minimum_required(VERSION 2.8)
-
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++14 -Woverloaded-virtual -Werror=reorder -Wno-address-of-packed-member")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-long-long -Woverloaded-virtual -Werror=reorder -Wno-address-of-packed-member")
 set(LINK_FLAGS "-libverbs -lnuma -lpthread -pthread -lrt -lglog -lgflags")
 link_libraries(${LINK_FLAGS})
 
@@ -28,6 +36,8 @@ add_definitions(-DCACHELINE_SIZE=64)
 
 include_directories(dbcore)
 include_directories(masstree)
+include_directories(dash/src)
+include_directories(dash/deps)
 include_directories(third-party/sparsehash/src)
 
 add_subdirectory(benchmarks)

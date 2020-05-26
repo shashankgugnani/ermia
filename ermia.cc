@@ -108,7 +108,7 @@ rc_t ConcurrentMasstreeIndex::Scan(transaction *t, const varstr &start_key,
       uppervk = *end_key;
     }
     masstree_.search_range_call(start_key, end_key ? &uppervk : nullptr, cb,
-                                t->xc);
+                                t->GetXIDContext());
   }
   return c.return_code;
 }
@@ -131,7 +131,7 @@ rc_t ConcurrentMasstreeIndex::ReverseScan(transaction *t,
       lowervk = *end_key;
     }
     masstree_.rsearch_range_call(start_key, end_key ? &lowervk : nullptr, cb,
-                                 t->xc);
+                                 t->GetXIDContext());
   }
   return c.return_code;
 }
@@ -141,6 +141,79 @@ std::map<std::string, uint64_t> ConcurrentMasstreeIndex::Clear() {
   masstree_.tree_walk(w);
   masstree_.clear();
   return std::map<std::string, uint64_t>();
+}
+
+bool DashExHash::InsertIfAbsent(transaction *t, const varstr &key,
+                                             OID oid) {
+  // FIXME(tzwang): adapt Dash to use varstr directly or make it agnostic
+  varstr *vk = t->string_allocator().next(key.l + sizeof(dash::string_key));
+  dash::string_key *var_key = (dash::string_key *)vk->p;
+  memcpy(var_key->key, key.p, key.l);
+  int ret = hashtab_->Insert(var_key, oid, false);
+  return ret == 0;
+}
+
+rc_t DashExHash::DoTreePut(transaction &t, const varstr *k,
+                                varstr *v, bool expect_new, bool upsert,
+                                OID *inserted_oid) {
+  ASSERT(k);
+  ASSERT((char *)k->data() == (char *)k + sizeof(varstr));
+  ASSERT(!expect_new || v);
+  t.ensure_active();
+
+  if (expect_new) {
+    rc_t rc = TryInsert(t, k, v, upsert, inserted_oid);
+    if (rc._val != RC_FALSE) {
+      return rc;
+    }
+  }
+
+  // do regular search
+  OID oid = 0;
+  rc_t rc = {RC_INVALID};
+  GetOID(*k, rc, t.GetXIDContext(), oid);
+  if (rc._val == RC_TRUE) {
+    return t.Update(descriptor_, oid, k, v);
+  } else {
+    return rc_t{RC_ABORT_INTERNAL};
+  }
+}
+
+void DashExHash::Get(transaction *t, rc_t &rc, const varstr &key, varstr &value, OID *out_oid) {
+  OID oid = 0;
+  rc = {RC_INVALID};
+
+  // FIXME(tzwang): adapt Dash to use varstr directly or make it agnostic
+  varstr *vk = t->string_allocator().next(key.l + sizeof(dash::string_key));
+  dash::string_key *var_key = (dash::string_key *)vk->p;
+  memcpy(var_key->key, key.p, key.l);
+  oid = hashtab_->Get(var_key, false);
+  if (oid == INVALID_OID) {
+    rc._val = RC_FALSE;
+  } else {
+    if (t) {
+      t->ensure_active();
+      dbtuple *tuple = nullptr;
+      // Key-OID mapping exists, now try to get the actual tuple to be sure
+      if (config::is_backup_srv()) {
+        tuple = oidmgr->BackupGetVersion(
+            descriptor_->GetTupleArray(),
+            descriptor_->GetPersistentAddressArray(), oid, t->GetXIDContext());
+      } else {
+        tuple = oidmgr->oid_get_version(descriptor_->GetTupleArray(), oid, t->GetXIDContext());
+      }
+
+      if (tuple) {
+        if (out_oid) {
+          *out_oid = oid;
+        }
+        volatile_write(rc._val, t->DoTupleRead(tuple, &value)._val);
+      } else {
+        volatile_write(rc._val, RC_FALSE);
+      }
+      ASSERT(rc._val == RC_FALSE || rc._val == RC_TRUE);
+    }
+  }
 }
 
 void ConcurrentMasstreeIndex::Get(transaction *t, rc_t &rc, const varstr &key,
@@ -155,7 +228,7 @@ void ConcurrentMasstreeIndex::Get(transaction *t, rc_t &rc, const varstr &key,
     MM::epoch_exit(0, e);
   } else {
     t->ensure_active();
-    bool found = masstree_.search(key, oid, t->xc->begin_epoch, &sinfo);
+    bool found = masstree_.search(key, oid, t->GetXIDContext()->begin_epoch, &sinfo);
 
     dbtuple *tuple = nullptr;
     if (found) {
@@ -163,10 +236,10 @@ void ConcurrentMasstreeIndex::Get(transaction *t, rc_t &rc, const varstr &key,
       if (config::is_backup_srv()) {
         tuple = oidmgr->BackupGetVersion(
             descriptor_->GetTupleArray(),
-            descriptor_->GetPersistentAddressArray(), oid, t->xc);
+            descriptor_->GetPersistentAddressArray(), oid, t->GetXIDContext());
       } else {
         tuple =
-            oidmgr->oid_get_version(descriptor_->GetTupleArray(), oid, t->xc);
+            oidmgr->oid_get_version(descriptor_->GetTupleArray(), oid, t->GetXIDContext());
       }
       if (!tuple) {
         found = false;
@@ -208,7 +281,7 @@ void ConcurrentMasstreeIndex::PurgeTreeWalker::on_node_failure() {
 bool ConcurrentMasstreeIndex::InsertIfAbsent(transaction *t, const varstr &key,
                                              OID oid) {
   typename ConcurrentMasstree::insert_info_t ins_info;
-  bool inserted = masstree_.insert_if_absent(key, oid, t->xc, &ins_info);
+  bool inserted = masstree_.insert_if_absent(key, oid, t->GetXIDContext(), &ins_info);
 
   if (!inserted) {
     return false;
@@ -260,7 +333,7 @@ rc_t ConcurrentMasstreeIndex::DoTreePut(transaction &t, const varstr *k,
   // do regular search
   OID oid = 0;
   rc_t rc = {RC_INVALID};
-  GetOID(*k, rc, t.xc, oid);
+  GetOID(*k, rc, t.GetXIDContext(), oid);
   if (rc._val == RC_TRUE) {
     return t.Update(descriptor_, oid, k, v);
   } else {

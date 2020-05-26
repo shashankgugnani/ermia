@@ -218,20 +218,7 @@ static inline void volatile_write(T volatile &x, U const &y) {
   SPAM(msg, ##__VA_ARGS__); \
   abort();
 
-#ifdef __GNUC__
-/* GCC's offsetof() macro is broken in C++ for versions <= 4.9.0 when
-   array indexes are not known at compile time.
-
-   See https://gcc.gnu.org/bugzilla/show_bug.cgi?id=14932
-
-   Clang works fine. Not sure about other compilers.
-
-   Work around: good old-fashioned null pointer arithmetic...
- */
-#define OFFSETOF(tp, expr) (((uint64_t)(&((tp *)0)->expr)) - ((uint64_t)((tp *)0)))
-#else
 #define OFFSETOF(tp, expr) offsetof(tp, expr)
-#endif
 
 /* A C++11 version of python's enumerate() function, intended for use
    with range-based for loops.
