@@ -2417,7 +2417,11 @@ class tpcc_bench_runner : public bench_runner {
         }
       }
     } else {
-      db->CreateMasstreeTable(name, primary_idx_name);
+      if (std::string(name) == std::string("warehouse")) {
+        db->CreateDashExHashTable(name, primary_idx_name);
+      } else {
+        db->CreateMasstreeTable(name, primary_idx_name);
+      }
     }
   }
 

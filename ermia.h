@@ -19,9 +19,14 @@ public:
 
   // All supported index types
   static const uint16_t kIndexConcurrentMasstree = 0x1;
+  static const uint16_t kIndexDashExHash = 0x2;
 
   inline void CreateMasstreeTable(const char *name, const char *primary_name = nullptr) {
     CreateTable(kIndexConcurrentMasstree, name, primary_name);
+  }
+
+  inline void CreateDashExHashTable(const char *name, const char *primary_name = nullptr) {
+    CreateTable(kIndexDashExHash, name, primary_name);
   }
 
   inline transaction *NewTransaction(uint64_t txn_flags, str_arena &arena,
@@ -279,8 +284,26 @@ public:
   inline rc_t Remove(transaction *t, const varstr &key) override {
     return DoTreePut(*t, &key, nullptr, false, false, nullptr);
   }
+  rc_t Scan(transaction *t, const varstr &start_key, const varstr *end_key,
+            ScanCallback &callback, str_arena *arena) override {
+    // Not supported
+    return rc_t{RC_FALSE};
+  }
+  rc_t ReverseScan(transaction *t, const varstr &start_key,
+                   const varstr *end_key, ScanCallback &callback,
+                   str_arena *arena) override {
+    // Not supported
+    return rc_t{RC_FALSE};
+  }
+
+  // Not implemented
+  size_t Size() override { return 0; };
+  std::map<std::string, uint64_t> Clear() override {
+    return std::map<std::string, uint64_t>();
+  }
 
   inline void SetArrays() override { } 
+  inline void *GetTable() override { return nullptr; }
 
   inline void
   GetOID(const varstr &key, rc_t &rc, TXN::xid_context *xc, OID &out_oid,
@@ -289,6 +312,7 @@ public:
     varstr *vk = xc->xct->string_allocator().next(key.l + sizeof(dash::string_key));
     dash::string_key *var_key = (dash::string_key *)vk->p;
     memcpy(var_key->key, key.p, key.l);
+    var_key->length = key.l;
     OID oid = hashtab_->Get(var_key, false);
     if (oid != INVALID_OID) {
       out_oid = oid;

@@ -53,6 +53,10 @@ void Engine::CreateTable(uint16_t index_type, const char *name,
     index_desc =
         (new ConcurrentMasstreeIndex(name, primary_name))->GetDescriptor();
     break;
+  case kIndexDashExHash:
+    index_desc =
+        (new DashExHash(name, primary_name))->GetDescriptor();
+    break;
   default:
     LOG(FATAL) << "Wrong index type: " << index_type;
     break;
@@ -149,6 +153,7 @@ bool DashExHash::InsertIfAbsent(transaction *t, const varstr &key,
   varstr *vk = t->string_allocator().next(key.l + sizeof(dash::string_key));
   dash::string_key *var_key = (dash::string_key *)vk->p;
   memcpy(var_key->key, key.p, key.l);
+  var_key->length = key.l;
   int ret = hashtab_->Insert(var_key, oid, false);
   return ret == 0;
 }
@@ -187,6 +192,7 @@ void DashExHash::Get(transaction *t, rc_t &rc, const varstr &key, varstr &value,
   varstr *vk = t->string_allocator().next(key.l + sizeof(dash::string_key));
   dash::string_key *var_key = (dash::string_key *)vk->p;
   memcpy(var_key->key, key.p, key.l);
+  var_key->length = key.l;
   oid = hashtab_->Get(var_key, false);
   if (oid == INVALID_OID) {
     rc._val = RC_FALSE;
