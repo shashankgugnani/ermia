@@ -149,12 +149,12 @@ std::map<std::string, uint64_t> ConcurrentMasstreeIndex::Clear() {
 
 bool DashExHash::InsertIfAbsent(transaction *t, const varstr &key,
                                              OID oid) {
-  // FIXME(tzwang): adapt Dash to use varstr directly or make it agnostic
-  varstr *vk = t->string_allocator().next(key.l + sizeof(dash::string_key));
-  dash::string_key *var_key = (dash::string_key *)vk->p;
+  dash::string_key *var_key = (dash::string_key*)MM::allocate(key.l + sizeof(dash::string_key));
   memcpy(var_key->key, key.p, key.l);
   var_key->length = key.l;
-  int ret = hashtab_->Insert(var_key, oid, false);
+  int ret = hashtab_->Insert(var_key, (dash::Value_t)oid, false);
+  OID o = (OID)(uint64_t)hashtab_->Get(var_key, false);
+  ALWAYS_ASSERT(o != 0);
   return ret == 0;
 }
 
@@ -188,13 +188,13 @@ void DashExHash::Get(transaction *t, rc_t &rc, const varstr &key, varstr &value,
   OID oid = 0;
   rc = {RC_INVALID};
 
-  // FIXME(tzwang): adapt Dash to use varstr directly or make it agnostic
-  varstr *vk = t->string_allocator().next(key.l + sizeof(dash::string_key));
-  dash::string_key *var_key = (dash::string_key *)vk->p;
+  dash::string_key *var_key = (dash::string_key*)MM::allocate(key.l + sizeof(dash::string_key));
   memcpy(var_key->key, key.p, key.l);
   var_key->length = key.l;
-  oid = hashtab_->Get(var_key, false);
-  if (oid == INVALID_OID) {
+  ALWAYS_ASSERT(var_key->length > 0);
+  oid = (OID)(uint64_t)hashtab_->Get(var_key, false);
+  if (oid == 0) {//INVALID_OID) {
+    ALWAYS_ASSERT(false);
     rc._val = RC_FALSE;
   } else {
     if (t) {

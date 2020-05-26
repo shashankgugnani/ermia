@@ -241,7 +241,6 @@ class ycsb_usertable_loader : public bench_loader {
       ermia::varstr &k = str(sizeof(uint64_t));
       BuildKey(start_key + i, k);
       ermia::varstr &v = str(0);
-      BuildKey(start_key + i, k);
       tbl->Get(txn, rc, k, v, &oid);
       ALWAYS_ASSERT(*(char*)v.data() == 'a');
       TryVerifyStrict(rc);
@@ -258,7 +257,8 @@ class ycsb_usertable_loader : public bench_loader {
 class ycsb_bench_runner : public bench_runner {
  public:
   ycsb_bench_runner(ermia::Engine *db) : bench_runner(db) {
-    db->CreateMasstreeTable("USERTABLE");
+    db->CreateDashExHashTable("USERTABLE");
+    //db->CreateMasstreeTable("USERTABLE");
   }
 
   virtual void prepare(char *) {

@@ -313,8 +313,8 @@ public:
     dash::string_key *var_key = (dash::string_key *)vk->p;
     memcpy(var_key->key, key.p, key.l);
     var_key->length = key.l;
-    OID oid = hashtab_->Get(var_key, false);
-    if (oid != INVALID_OID) {
+    OID oid = (OID)(uint64_t)hashtab_->Get(var_key, false);
+    if (oid != 0) {//INVALID_OID) {
       out_oid = oid;
       volatile_write(rc._val, RC_TRUE);
     } else {
