@@ -4,6 +4,8 @@
 #include "sm-log.h"
 #include "sm-thread.h"
 
+#include "../timer.h"
+
 namespace ermia {
 namespace thread {
 
@@ -141,6 +143,7 @@ void Thread::IdleTask() {
   RCU::rcu_register();
   MM::register_thread();
   RCU::rcu_start_tls_cache(32, 100000);
+  TIMER_HP_REGISTER();
 
   while (not volatile_read(shutdown)) {
     if (volatile_read(state) == kStateHasWork) {
@@ -158,7 +161,9 @@ void Thread::IdleTask() {
         // the
         // same smallest offset and stuck at wait_for_durable.
         while (logmgr->durable_flushed_lsn().offset() < my_offset) {
+          TIMER_HP_START("log_flush");
           logmgr->flush();
+          TIMER_HP_END("log_flush");
         }
         logmgr->set_tls_lsn_offset(0);  // clear thread as if did nothing!
       }

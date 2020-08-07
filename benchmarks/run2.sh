@@ -6,6 +6,8 @@
 # $5 - other parameters like --retry-aborted-transactions
 # $6 - other parameters for the workload, e.g., --fast-new-order-id-gen
 
+#set -x
+
 if [[ $# -lt 4 ]]; then
     echo "Too few arguments. "
     echo "Usage $0 <executable> <benchmark> <threads> <runtime>"
@@ -27,7 +29,7 @@ if [[ "$bench" != "tpce" && "$bench" != "ycsb" && "$bench" != "tpcc" ]]; then
   echo "Unsupported benchmark $bench."
 fi
 
-options="$exe -verbose $1 -benchmark $bench -threads $threads -log_data_dir $LOGDIR -log_buffer_mb=$logbuf_mb" 
+options="numactl -N 0 $exe -verbose $1 -benchmark $bench -threads $threads -log_data_dir $LOGDIR -log_buffer_mb=$logbuf_mb" 
 echo $options
 if [ "$bench" == "tpcc" ]; then
   btype=${workload:4:1}

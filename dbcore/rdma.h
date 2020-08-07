@@ -32,6 +32,7 @@
 
 // Use the experimental verbs and libmlx5 on Connect-IB to do atomic ops
 // #define EXP_VERBS 1
+#define USE_ODP 1
 
 namespace ermia {
 namespace rdma {
@@ -66,16 +67,25 @@ struct context {
     uint64_t buf_size;
     memory_region(struct ibv_pd *pd, char *addr, uint64_t size)
         : buf(addr), buf_size(size) {
-#ifdef EXP_VERBS
+#ifdef USE_ODP
       struct ibv_exp_reg_mr_in in;
+      struct ibv_exp_prefetch_attr prefetch_attr = {
+          .flags     = IBV_EXP_PREFETCH_WRITE_ACCESS,
+          .addr      = addr,
+          .length    = size,
+          .comp_mask = 0
+      };
+
       memset(&in, 0, sizeof(in));
       in.pd = pd;
       in.addr = buf;
       in.length = buf_size;
       in.exp_access = IBV_EXP_ACCESS_REMOTE_WRITE | IBV_EXP_ACCESS_REMOTE_READ |
-                      IBV_EXP_ACCESS_REMOTE_ATOMIC | IBV_EXP_ACCESS_LOCAL_WRITE;
+                      IBV_EXP_ACCESS_REMOTE_ATOMIC | IBV_EXP_ACCESS_LOCAL_WRITE |
+		      IBV_EXP_ACCESS_ON_DEMAND;
       in.create_flags = IBV_EXP_REG_MR_CREATE_CONTIG;
       mr = ibv_exp_reg_mr(&in);
+      ibv_exp_prefetch_mr(mr, &prefetch_attr);
 #else
       mr = ibv_reg_mr(pd, buf, buf_size,
                       IBV_ACCESS_REMOTE_WRITE | IBV_ACCESS_LOCAL_WRITE |

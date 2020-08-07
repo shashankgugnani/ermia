@@ -5,6 +5,8 @@
 #include "stopwatch.h"
 #include "../util.h"
 
+#include "../timer.h"
+
 namespace {
 
 uint64_t get_starting_byte_offset(ermia::sm_log_recover_mgr *lm) {
@@ -830,8 +832,11 @@ void sm_log_alloc_mgr::_log_write_daemon() {
       }
     }
     segment_id *durable_sid = nullptr;
+    TIMER_HP_REGISTER();
     if (new_dlsn_offset > _durable_flushed_lsn_offset) {
+      TIMER_HP_START("PrimaryFlushLog");
       durable_sid = PrimaryFlushLog(new_dlsn_offset);
+      TIMER_HP_END("PrimaryFlushLog");
     }
 
     RCU::rcu_exit();

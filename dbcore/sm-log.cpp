@@ -5,6 +5,8 @@
 #include "sm-thread.h"
 #include <cstring>
 
+#include "../timer.h"
+
 namespace ermia {
 
 sm_log *logmgr = NULL;
@@ -73,7 +75,13 @@ void sm_log::enqueue_committed_xct(uint32_t worker_id, uint64_t start_time) {
   get_impl(this)->_lm.enqueue_committed_xct(worker_id, start_time);
 }
 
-LSN sm_log::flush() { return get_impl(this)->_lm.flush(); }
+LSN sm_log::flush() {
+  TIMER_HP_REGISTER();
+  TIMER_HP_START("log_flush");
+  LSN lsn = get_impl(this)->_lm.flush();
+  TIMER_HP_END("log_flush");
+  return lsn;
+}
 
 void sm_log::update_chkpt_mark(LSN cstart, LSN cend) {
   get_impl(this)->_lm._lm.update_chkpt_mark(cstart, cend);

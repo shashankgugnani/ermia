@@ -19,10 +19,15 @@ void context::init(const char *server) {
     server_name = std::string("");
   }
 
-  struct ibv_device **dev_list = ibv_get_device_list(NULL);
+  int dev_cnt;
+  struct ibv_device **dev_list = ibv_get_device_list(&dev_cnt);
   THROW_IF(not dev_list, illegal_argument, "No IB devices found");
 
-  ib_dev = dev_list[0];
+  for (int i = 0; i < dev_cnt; ++i) {
+    if (strcmp("mlx5_0", ibv_get_device_name(dev_list[i])) == 0)
+      ib_dev = dev_list[i];
+  }
+  //ib_dev = dev_list[0];
   THROW_IF(not ib_dev, illegal_argument, "Cannot assign IB device");
 
   ctx = ibv_open_device(ib_dev);

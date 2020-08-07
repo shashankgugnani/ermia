@@ -232,11 +232,15 @@ inline void CalibrateNvramDelay() {
   free(test_arr);
 }
 
+#define _clflushopt(addr)                                 \
+    __asm__ __volatile__(".byte 0x66; clflush %0" : "+m"  \
+                         (*(volatile char *)(addr)));
+
 inline void NvramClflush(const char *data, uint64_t size) {
   ASSERT(config::nvram_delay_type == config::kDelayClflush);
   uint32_t clines = size / CACHELINE_SIZE;
   for (uint32_t i = 0; i < clines; ++i) {
-    _mm_clflush(&data[i * CACHELINE_SIZE]);
+    _clflushopt(&data[i * CACHELINE_SIZE]);
   }
 }
 

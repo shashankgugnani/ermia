@@ -14,6 +14,8 @@
 # $9 - Additional parameters (secondaries)
 # $10 and beyond - a list of secondary server hosts
 
+#set -x
+
 CC=$1; shift
 scale_factor=$1; shift
 duration=$1; shift

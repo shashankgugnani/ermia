@@ -7,6 +7,8 @@
 # $6 - other parameters like --retry-aborted-transactions
 # $7 - other parameters for the workload, e.g., --fast-new-order-id-gen
 
+#set -x
+
 if [[ $# -lt 5 ]]; then
     echo "Too few arguments. "
     echo "Usage $0 <executable> <benchmark> <threads> <scalefactor> <runtime>"
@@ -36,7 +38,7 @@ else
   echo "logbuf_mb is set to $logbuf_mb";
 fi
 
-options="$exe -verbose $1 -benchmark $bench -threads $threads -scale_factor $sf -seconds $runtime \
+options="numactl -N 0 $exe -verbose $1 -benchmark $bench -threads $threads -scale_factor $sf -seconds $runtime \
   -log_data_dir $LOGDIR -log_buffer_mb=$logbuf_mb -log_segment_mb=16384 -parallel_loading"
 echo $options
 if [ "$bench" == "tpcc" ]; then

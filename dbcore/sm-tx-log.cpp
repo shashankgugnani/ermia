@@ -1,6 +1,8 @@
 #include <string>
 #include "sm-log-impl.h"
 
+#include "../timer.h"
+
 namespace {
 /* No point allocating these individually or repeatedly---they're
    thread-private with a reasonably small maximum size (~10kB).
@@ -121,12 +123,17 @@ LSN sm_tx_log::get_clsn() {
 }
 
 LSN sm_tx_log::pre_commit() {
+  TIMER_HP_REGISTER();
+  TIMER_HP_START("log_pre_commit");
   auto *impl = get_log_impl(this);
   if (not impl->_commit_block) impl->enter_precommit();
+  TIMER_HP_END("log_pre_commit");
   return impl->_commit_block->block->next_lsn();
 }
 
 LSN sm_tx_log::commit(LSN *pdest) {
+  TIMER_HP_REGISTER();
+  TIMER_HP_START("log_commit");
   // make sure we acquired a commit block
   LSN clsn = pre_commit();
 
@@ -138,6 +145,7 @@ LSN sm_tx_log::commit(LSN *pdest) {
 
   impl->_log->_lm.release(impl->_commit_block);
   tls_log_space_used = false;
+  TIMER_HP_END("log_commit");
   return clsn;
 }
 

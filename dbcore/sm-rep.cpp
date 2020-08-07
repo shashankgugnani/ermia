@@ -3,6 +3,8 @@
 #include "sm-rep.h"
 #include "../ermia.h"
 
+#include "../timer.h"
+
 namespace ermia {
 namespace rep {
 std::condition_variable backup_shutdown_trigger;
@@ -234,10 +236,13 @@ void PrimaryShutdown() {
 
 void primary_ship_log_buffer_all(const char *buf, uint32_t size, bool new_seg,
                                  uint64_t new_seg_start_offset) {
+  TIMER_HP_REGISTER();
   backup_sockfds_mutex.lock();
   if (config::log_ship_by_rdma) {
     // This is async - returns immediately. Caller should poll/wait for ack.
+    TIMER_HP_START("rdma");
     primary_ship_log_buffer_rdma(buf, size, new_seg, new_seg_start_offset);
+    TIMER_HP_END("rdma");
   } else {
     // This is blocking because of send(), but doesn't wait for backup ack.
     primary_ship_log_buffer_tcp(buf, size);

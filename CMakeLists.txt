@@ -17,7 +17,7 @@ set(MASSTREE_CONFIG "--enable-max-key-len=1024 --with-malloc=malloc")
 
 if(${CMAKE_BUILD_TYPE} STREQUAL "Debug")
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -include ${CMAKE_CURRENT_SOURCE_DIR}/masstree/config-debug.h")
-  set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -g")
+  set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -g -w")
 else()
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -include ${CMAKE_CURRENT_SOURCE_DIR}/masstree/config-release.h")
   set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O3")
@@ -25,6 +25,9 @@ endif()
 
 # Assume 64-byte cache line
 add_definitions(-DCACHELINE_SIZE=64)
+
+# Disable timer
+add_definitions(-DCONFIG_TIMER=0)
 
 include_directories(dbcore)
 include_directories(masstree)

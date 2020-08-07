@@ -5,6 +5,8 @@
 #include "dbcore/serial.h"
 #include "ermia.h"
 
+#include "timer.h"
+
 namespace ermia {
 
 transaction::transaction(uint64_t flags, str_arena &sa)
@@ -1311,9 +1313,13 @@ rc_t transaction::Update(IndexDescriptor *index_desc, OID oid, const varstr *k, 
                                  fat_ptr::make((void *)v, size_code),
                                  DEFAULT_ALIGNMENT_BITS);
     } else {
+      //std::cout << "record_size=" << data_size << std::endl;
+      TIMER_HP_REGISTER();
+      TIMER_HP_START("log_update");
       log->log_update(tuple_fid, oid, fat_ptr::make((void *)v, size_code),
                         DEFAULT_ALIGNMENT_BITS,
                         tuple->GetObject()->GetPersistentAddressPtr());
+      TIMER_HP_END("log_update");
 
       if (config::log_key_for_update) {
         auto key_size = align_up(k->size() + sizeof(varstr));
@@ -1412,9 +1418,13 @@ void transaction::FinishInsert(OrderedIndex *index, OID oid, const varstr *key, 
     // log the whole varstr so that recovery can figure out the real size
     // of the tuple, instead of using the decoded (larger-than-real) size.
     FID tuple_fid = id->GetTupleFid();
+    //std::cout << "record_size=" << record_size << std::endl;
+    TIMER_HP_REGISTER();
+    TIMER_HP_START("log_insert");
     log->log_insert(tuple_fid, oid, fat_ptr::make((void *)value, size_code),
                     DEFAULT_ALIGNMENT_BITS,
                     tuple->GetObject()->GetPersistentAddressPtr());
+    TIMER_HP_END("log_insert");
   }
 
   // Note: here we log the whole key varstr so that recovery

@@ -5,7 +5,7 @@
 // In FOEDUS, we have 10 and with the knobs it can choose from any one field
 // randomly.
 const uint32_t kFields = 1;
-const uint32_t kFieldLength = 10;
+const uint32_t kFieldLength = 1024;
 const uint64_t kRecordSize = kFieldLength * kFields;
 const uint32_t kMaxWorkers = 1024;
 
